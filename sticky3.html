@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sticky navigation on scroll direction</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0;}
+body { overflow-x: hidden; }
+img { display: block; width: 375px; height: auto; }
+.page, .nav-wrapper, .nav { width: 100%; }
+.nav-wrapper { position: relative; }
+
+.sticky-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    background: #fff;
+    transform: translateY(-100%);
+    pointer-events: none;
+    visibility: hidden;
+    will-change: transform;
+}
+.sticky-nav.is-active {
+    visibility: visible;
+    pointer-events: auto;
+}
+</style>
+</head>
+<body>
+<div class="page">
+    <img src="stripe.png" alt="">
+
+    <div class="nav-wrapper">
+        <div class="nav">
+            <img src="nav-top.png" alt="">
+            <img id="navBot" src="nav-bot.png" alt="">
+        </div>
+    </div>
+
+    <img src="page.png" alt="">
+</div>
+
+<div class="sticky-nav" id="stickyNav" aria-hidden="true">
+    <div class="sticky-nav-top" id="stickyNavTop">
+        <img src="stripe.png" alt="">
+        <img src="nav-top.png" alt="">
+    </div>
+    <img id="stickyNavBot" src="nav-bot.png" alt="">
+</div>
+
+<script>
+const navBot = document.getElementById('navBot');
+const stickyNav = document.getElementById('stickyNav');
+const stickyNavTop = document.getElementById('stickyNavTop');
+const stickyNavBot = document.getElementById('stickyNavBot');
+
+let lastScrollY = window.scrollY;
+let lastDirection = null;
+let stickyNavPinned = false;
+let stickyNavAnimation = null;
+
+function stickyNavTopHeight() {
+    return stickyNavTop.getBoundingClientRect().height;
+}
+
+function transitionStickyNav(targetY) {
+    const currentTransform = getComputedStyle(stickyNav).transform;
+    const currentY = currentTransform === 'none'
+        ? -stickyNavTopHeight()
+        : new DOMMatrix(currentTransform).m42;
+
+    if (stickyNavAnimation) stickyNavAnimation.cancel();
+
+    stickyNavAnimation = stickyNav.animate(
+        [
+            { transform: `translateY(${currentY}px)` },
+            { transform: `translateY(${targetY}px)` }
+        ],
+        {
+            duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300,
+            easing: 'ease',
+            fill: 'forwards'
+        }
+    );
+    stickyNavAnimation.onfinish = function () {
+        stickyNav.style.transform = `translateY(${targetY}px)`;
+        stickyNavAnimation.cancel();
+        stickyNavAnimation = null;
+    };
+}
+
+function pinStickyNav() {
+    if (stickyNavPinned) return;
+
+    stickyNavPinned = true;
+    stickyNavBot.src = 'nav-bot-burger.png';
+    stickyNav.classList.add('is-active');
+    stickyNav.setAttribute('aria-hidden', 'false');
+    stickyNav.style.transform = `translateY(${-stickyNavTopHeight()}px)`;
+}
+
+function resetStickyNav() {
+    stickyNavPinned = false;
+    stickyNavBot.src = 'nav-bot.png';
+    if (stickyNavAnimation) {
+        stickyNavAnimation.cancel();
+        stickyNavAnimation = null;
+    }
+    stickyNav.classList.remove('is-active');
+    stickyNav.style.transform = '';
+    stickyNav.setAttribute('aria-hidden', 'true');
+}
+
+window.addEventListener('scroll', function () {
+    const currentScrollY = window.scrollY;
+    const delta = currentScrollY - lastScrollY;
+
+    if (Math.abs(delta) < 1) return;
+
+    const direction = delta > 0 ? 'down' : 'up';
+
+    if (direction === 'down' && navBot.getBoundingClientRect().top <= 0) {
+        pinStickyNav();
+    }
+
+    if (stickyNavPinned && direction !== lastDirection) {
+        stickyNavBot.src = direction === 'down'
+            ? 'nav-bot-burger.png'
+            : 'nav-bot.png';
+        transitionStickyNav(direction === 'up' ? 0 : -stickyNavTopHeight());
+    }
+
+    if (direction === 'up' && stickyNavPinned &&
+        navBot.getBoundingClientRect().top >= stickyNavTopHeight()) {
+        resetStickyNav();
+    }
+
+    lastDirection = direction;
+    lastScrollY = currentScrollY;
+}, { passive: true });
+
+window.addEventListener('pageshow', function () {
+    resetStickyNav();
+    lastScrollY = window.scrollY;
+    lastDirection = null;
+});
+</script>
+</body>
+</html>
